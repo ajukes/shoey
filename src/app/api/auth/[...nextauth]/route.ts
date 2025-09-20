@@ -3,6 +3,16 @@ import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient, PlayerRole } from '@prisma/client';
 
+// Debug logging for environment variables
+console.log('=== NextAuth Environment Debug ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
+console.log('NEXTAUTH_SECRET exists:', !!process.env.NEXTAUTH_SECRET);
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('GOOGLE_CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+console.log('GOOGLE_CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+console.log('=====================================');
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
