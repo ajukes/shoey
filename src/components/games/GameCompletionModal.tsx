@@ -70,25 +70,16 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
   const [ruleAssignments, setRuleAssignments] = useState<RuleAssignment[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
 
-  // Existing player stats for re-completion
-  const [existingPlayerStats, setExistingPlayerStats] = useState<any[]>([]);
-
-  // Fetch complete game data if gamePlayers is missing or if we need playerStats
+  // Fetch complete game data if gamePlayers is missing
   useEffect(() => {
     async function fetchGameData() {
-      if ((!game.gamePlayers || game.status === 'COMPLETED') && !fetchingGameData) {
+      if (!game.gamePlayers && !fetchingGameData) {
         setFetchingGameData(true);
         try {
           const response = await fetch(`/api/games/${game.id}`);
           if (response.ok) {
             const completeGame = await response.json();
             setGameData(completeGame);
-
-            // Store existing player stats if game is completed
-            if (completeGame.status === 'COMPLETED' && completeGame.playerStats) {
-              setExistingPlayerStats(completeGame.playerStats);
-              console.log('Loaded existing player stats:', completeGame.playerStats);
-            }
           }
         } catch (error) {
           console.error('Error fetching game data:', error);
@@ -98,7 +89,7 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
       }
     }
     fetchGameData();
-  }, [game.id, game.gamePlayers, game.status]);
+  }, [game.id, game.gamePlayers]);
 
   // Fetch rules based on team's rules profile when moving to rules step
   // Load existing rule assignments if game is already completed
@@ -123,7 +114,7 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
 
           if (existingAssignment) {
             existingAssignment.count += 1;
-            existingAssignment.points = existingAssignment.count * (point.points / existingAssignment.count);
+            existingAssignment.points += point.points; // Add the points, don't recalculate
           } else {
             assignments.push({
               ruleId: point.ruleId,
@@ -225,20 +216,17 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
         const playerId = gamePlayer.player.id;
         const playerAssignments = ruleAssignments.filter(a => a.playerId === playerId);
 
-        // Find existing stats for this player
-        const existingStats = existingPlayerStats.find(stat => stat.playerId === playerId);
-
         return {
           playerId,
-          goalsScored: existingStats?.goalsScored || 0,
-          goalAssists: existingStats?.goalAssists || 0,
-          greenCards: existingStats?.greenCards || 0,
-          yellowCards: existingStats?.yellowCards || 0,
-          redCards: existingStats?.redCards || 0,
-          saves: existingStats?.saves || 0,
-          tackles: existingStats?.tackles || 0,
-          passes: existingStats?.passes || 0,
-          played: existingStats?.played !== false, // Default to true unless explicitly false
+          goalsScored: 0,
+          goalAssists: 0,
+          greenCards: 0,
+          yellowCards: 0,
+          redCards: 0,
+          saves: 0,
+          tackles: 0,
+          passes: 0,
+          played: true,
           ruleAssignments: playerAssignments
         };
       });

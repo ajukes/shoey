@@ -37,17 +37,6 @@ export async function GET(
             }
           }
         },
-        playerStats: {
-          include: {
-            player: {
-              select: {
-                id: true,
-                fullName: true,
-                nickname: true
-              }
-            }
-          }
-        },
         _count: {
           select: {
             playerStats: true,
