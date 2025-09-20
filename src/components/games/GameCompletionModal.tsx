@@ -105,25 +105,36 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
       if (response.ok) {
         const existingPoints = await response.json();
 
-        // Convert existing rule points back to rule assignments format
-        const assignments: RuleAssignment[] = [];
-        existingPoints.forEach((point: any) => {
-          const existingAssignment = assignments.find(
-            a => a.playerId === point.playerId && a.ruleId === point.ruleId
-          );
+        // Merge TEAM and CLUB rule points by taking MAX count for each rule
+        // This allows unified editing while preserving both point types on save
+        const mergedAssignments = new Map<string, RuleAssignment>();
 
-          if (existingAssignment) {
-            existingAssignment.count += 1;
-            existingAssignment.points += point.points; // Add the points, don't recalculate
+        existingPoints.forEach((point: any) => {
+          const key = `${point.playerId}-${point.ruleId}`;
+          const existing = mergedAssignments.get(key);
+
+          // Extract count from notes (format: "Manual assignment: X instances")
+          const countMatch = point.notes?.match(/(\d+) instances/);
+          const count = countMatch ? parseInt(countMatch[1]) : 1;
+          const pointsPerInstance = point.points / count;
+
+          if (existing) {
+            // Take MAX count between TEAM and CLUB versions
+            if (count > existing.count) {
+              existing.count = count;
+              existing.points = count * pointsPerInstance;
+            }
           } else {
-            assignments.push({
+            mergedAssignments.set(key, {
               ruleId: point.ruleId,
               playerId: point.playerId,
-              count: 1,
+              count,
               points: point.points
             });
           }
         });
+
+        const assignments = Array.from(mergedAssignments.values());
 
         setRuleAssignments(assignments);
         console.log('Loaded existing rule assignments:', assignments);

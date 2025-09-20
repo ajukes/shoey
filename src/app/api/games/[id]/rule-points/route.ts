@@ -14,7 +14,7 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get existing rule points for this game
+    // Get existing rule points for this game (both TEAM and CLUB for merging)
     const rulePoints = await prisma.playerGameRulePoints.findMany({
       where: {
         gameId: id,
@@ -35,6 +35,17 @@ export async function GET(
             pointsAwarded: true
           }
         }
+      },
+      select: {
+        id: true,
+        playerId: true,
+        ruleId: true,
+        points: true,
+        pointType: true,
+        isManual: true,
+        notes: true,
+        player: true,
+        rule: true
       },
       orderBy: [
         { player: { fullName: 'asc' } },
