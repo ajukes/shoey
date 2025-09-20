@@ -1,0 +1,32 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Vibrant gradient background -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="50%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#5b21b6"/>
+    </radialGradient>
+    <linearGradient id="trophy" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="50%" style="stop-color:#f3f4f6"/>
+      <stop offset="100%" style="stop-color:#d1d5db"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="32" height="32" fill="url(#bg)" rx="6"/>
+
+  <!-- Trophy -->
+  <g transform="translate(16,16)">
+    <!-- Cup -->
+    <path d="M-6,-8 L6,-8 L5,0 L-5,0 Z" fill="url(#trophy)" stroke="#d1d5db" stroke-width="0.5"/>
+    <!-- Handles -->
+    <circle cx="-7" cy="-5" r="2" fill="none" stroke="#ffffff" stroke-width="1"/>
+    <circle cx="7" cy="-5" r="2" fill="none" stroke="#ffffff" stroke-width="1"/>
+    <!-- Base -->
+    <rect x="-4" y="0" width="8" height="3" fill="#d1d5db"/>
+    <rect x="-5" y="3" width="10" height="2" fill="#d1d5db"/>
+    <!-- Shine -->
+    <ellipse cx="-2" cy="-6" rx="2" ry="1" fill="#ffffff" opacity="0.9"/>
+  </g>
+</svg>

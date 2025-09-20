@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  accounts      Account[]
+  player        Player?   @relation("UserPlayer")
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+model Season {
+  id        String   @id @default(cuid())
+  name      String
+  year      String   @unique
+  sport     String
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  leagues   League[]
+
+  @@map("seasons")
+}
+
+model League {
+  id          String       @id @default(cuid())
+  name        String
+  seasonId    String       @map("season_id")
+  image       String?
+  location    String?
+  sport       String
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  season      Season       @relation(fields: [seasonId], references: [id])
+  teamLeagues TeamLeague[]
+
+  @@map("leagues")
+}
+
+model Club {
+  id            String         @id @default(cuid())
+  name          String
+  avatar        String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  description   String?
+  founded       Int?
+  location      String?
+  players       Player[]
+  teams         Team[]
+  rulesProfiles RulesProfile[]
+
+  @@map("clubs")
+}
+
+model PlayingPosition {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  category  PositionCategory
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  players   Player[]
+
+  @@map("playing_positions")
+}
+
+model Team {
+  id                    String        @id @default(cuid())
+  name                  String
+  avatar                String?
+  clubId                String        @map("club_id")
+  defaultRulesProfileId String?       @map("default_rules_profile_id")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  games                 Game[]
+  gamePlayers           GamePlayer[]
+  players               Player[]
+  teamLeagues           TeamLeague[]
+  club                  Club          @relation(fields: [clubId], references: [id])
+  defaultRulesProfile   RulesProfile? @relation(fields: [defaultRulesProfileId], references: [id])
+
+  @@map("teams")
+}
+
+model TeamLeague {
+  id       String @id @default(cuid())
+  teamId   String @map("team_id")
+  leagueId String @map("league_id")
+  team     Team   @relation(fields: [teamId], references: [id])
+  league   League @relation(fields: [leagueId], references: [id])
+
+  @@unique([teamId, leagueId])
+  @@map("team_leagues")
+}
+
+model Player {
+  id                String                 @id @default(cuid())
+  userId            String?                @unique @map("user_id")
+  fullName          String                 @map("full_name")
+  nickname          String?
+  email             String?                @unique
+  mobileNumber      String?                @map("mobile_number")
+  avatar            String?
+  role              PlayerRole             @default(PLAYER)
+  clubId            String                 @map("club_id")
+  teamId            String?                @map("team_id")
+  playingPositionId String                 @map("playing_position_id")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  gameStats         GamePlayerStats[]
+  gamePlayers       GamePlayer[]
+  rulePoints        PlayerGameRulePoints[]
+  club              Club                   @relation(fields: [clubId], references: [id])
+  playingPosition   PlayingPosition        @relation(fields: [playingPositionId], references: [id])
+  team              Team?                  @relation(fields: [teamId], references: [id])
+  user              User?                  @relation("UserPlayer", fields: [userId], references: [id])
+
+  @@map("players")
+}
+
+model Rule {
+  id              String                 @id @default(cuid())
+  name            String                 @unique
+  description     String
+  category        RuleCategory           @default(MANUAL)
+  pointsAwarded   Int                    @map("points_awarded")
+  isMultiplier    Boolean                @default(false) @map("is_multiplier")
+  targetScope     TargetScope            @map("target_scope")
+  targetPositions PositionCategory[]     @map("target_positions")
+  isActive        Boolean                @default(true) @map("is_active")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  gameRulePoints  PlayerGameRulePoints[]
+  conditions      RuleCondition[]
+  rulesProfileRules RulesProfileRule[]
+
+  @@map("rules")
+}
+
+model RuleCondition {
+  id        String            @id @default(cuid())
+  ruleId    String            @map("rule_id")
+  variable        String
+  operator        ConditionOperator
+  value           Int
+  compareVariable String?           @map("compare_variable")
+  scope           ConditionScope
+  createdAt DateTime          @default(now()) @map("created_at")
+  rule      Rule              @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@map("rule_conditions")
+}
+
+model RulesProfile {
+  id            String             @id @default(cuid())
+  name          String
+  description   String?
+  clubId        String             @map("club_id")
+  isClubDefault Boolean            @default(false) @map("is_club_default")
+  isActive      Boolean            @default(true) @map("is_active")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  club          Club               @relation(fields: [clubId], references: [id])
+  rules         RulesProfileRule[]
+  teams         Team[]
+  gameRulePoints PlayerGameRulePoints[]
+
+  @@unique([clubId, name])
+  @@map("rules_profiles")
+}
+
+model RulesProfileRule {
+  id             String       @id @default(cuid())
+  profileId      String       @map("profile_id")
+  ruleId         String       @map("rule_id")
+  customPoints   Int?         @map("custom_points")
+  isEnabled      Boolean      @default(true) @map("is_enabled")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  profile        RulesProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  rule           Rule         @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, ruleId])
+  @@map("rules_profile_rules")
+}
+
+model Game {
+  id           String                 @id @default(cuid())
+  venue        String
+  goalsFor     Int?                   @map("goals_for")
+  goalsAgainst Int?                   @map("goals_against")
+  teamId       String                 @map("team_id")
+  status       GameStatus             @default(SCHEDULED)
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  address      String?
+  gameTime     String                 @map("game_time")
+  kit          KitType                @default(HOME)
+  meetTime     String                 @map("meet_time")
+  opponent     String?
+  dateTime     DateTime               @map("date_time")
+  homeAway     VenueType              @default(HOME) @map("home_away")
+  gamePlayers  GamePlayer[]
+  playerStats  GamePlayerStats[]
+  team         Team                   @relation(fields: [teamId], references: [id])
+  rulePoints   PlayerGameRulePoints[]
+
+  @@map("games")
+}
+
+model GamePlayer {
+  id       String  @id @default(cuid())
+  gameId   String  @map("game_id")
+  playerId String  @map("player_id")
+  teamId   String  @map("team_id")
+  isSquad  Boolean @default(true) @map("is_squad")
+  game     Game    @relation(fields: [gameId], references: [id])
+  player   Player  @relation(fields: [playerId], references: [id])
+  team     Team    @relation(fields: [teamId], references: [id])
+
+  @@unique([gameId, playerId])
+  @@map("game_players")
+}
+
+model GamePlayerStats {
+  id          String   @id @default(cuid())
+  playerId    String   @map("player_id")
+  gameId      String   @map("game_id")
+  goalsScored Int      @default(0) @map("goals_scored")
+  goalAssists Int      @default(0) @map("goal_assists")
+  greenCards  Int      @default(0) @map("green_cards")
+  yellowCards Int      @default(0) @map("yellow_cards")
+  redCards    Int      @default(0) @map("red_cards")
+  saves       Int?     @default(0)
+  tackles     Int?     @default(0)
+  passes      Int?     @default(0)
+  played      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  game        Game     @relation(fields: [gameId], references: [id])
+  player      Player   @relation(fields: [playerId], references: [id])
+
+  @@unique([playerId, gameId])
+  @@map("game_player_stats")
+}
+
+model PlayerGameRulePoints {
+  id           String       @id @default(cuid())
+  playerId     String       @map("player_id")
+  gameId       String       @map("game_id")
+  ruleId       String       @map("rule_id")
+  points       Int
+  pointType    PointType    @map("point_type")
+  profileId    String       @map("profile_id")
+  isManual     Boolean      @default(false) @map("is_manual")
+  notes        String?
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  game         Game         @relation(fields: [gameId], references: [id])
+  player       Player       @relation(fields: [playerId], references: [id])
+  rule         Rule         @relation(fields: [ruleId], references: [id])
+  profile      RulesProfile @relation(fields: [profileId], references: [id])
+
+  @@unique([playerId, gameId, ruleId, pointType])
+  @@map("player_game_rule_points")
+}
+
+model CustomVariable {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  label        String
+  description  String
+  scope        String
+  dataType     String   @default("number") @map("data_type")
+  defaultValue Int      @default(0) @map("default_value")
+  isActive     Boolean  @default(true) @map("is_active")
+  isBuiltIn    Boolean  @default(false) @map("is_built_in")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("custom_variables")
+}
+
+enum LeagueType {
+  HOCKEY
+  FOOTBALL
+  RUGBY
+  BASKETBALL
+  SOCCER
+  CRICKET
+}
+
+enum PositionCategory {
+  GOALKEEPER
+  DEFENDER
+  MIDFIELDER
+  FORWARD
+}
+
+enum PlayerRole {
+  PLAYER
+  CAPTAIN
+  MANAGER
+  ADMIN
+}
+
+enum RuleCategory {
+  GAME_RESULT
+  PLAYER_PERFORMANCE
+  MANUAL
+}
+
+enum TargetScope {
+  ALL_PLAYERS
+  BY_POSITION
+  INDIVIDUAL_PLAYER
+}
+
+enum ConditionOperator {
+  GREATER_THAN
+  EQUAL
+  LESS_THAN
+  GREATER_EQUAL
+  LESS_EQUAL
+  NOT_EQUAL
+}
+
+enum ConditionScope {
+  GAME
+  PLAYER
+}
+
+enum GameStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum KitType {
+  HOME
+  AWAY
+}
+
+enum VenueType {
+  HOME
+  AWAY
+}
+
+enum PointType {
+  TEAM
+  CLUB
+}
