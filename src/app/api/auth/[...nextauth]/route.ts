@@ -1,7 +1,8 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
-import { PrismaClient, PlayerRole } from '@prisma/client';
+import { PlayerRole } from '@prisma/client';
+import prisma from '@/lib/prisma-global';
 
 // Debug logging for environment variables
 console.log('=== NextAuth Environment Debug ===');
@@ -13,23 +14,6 @@ console.log('GOOGLE_CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
 console.log('GOOGLE_CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
 console.log('=====================================');
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-// Ensure DATABASE_URL is available for Prisma
-const databaseUrl = process.env.DATABASE_URL;
-console.log('Prisma DATABASE_URL check:', !!databaseUrl);
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  datasources: {
-    db: {
-      url: databaseUrl,
-    },
-  },
-});
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
