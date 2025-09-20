@@ -7,6 +7,9 @@ frontend:
         - npx prisma generate
     build:
       commands:
+        - echo "Build-time env check:"
+        - echo "NEXTAUTH_SECRET exists:" $([[ -n "$NEXTAUTH_SECRET" ]] && echo "true" || echo "false")
+        - echo "DATABASE_URL exists:" $([[ -n "$DATABASE_URL" ]] && echo "true" || echo "false")
         - npm run build
   artifacts:
     baseDirectory: .next
