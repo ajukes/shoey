@@ -15,6 +15,7 @@ interface Rule {
   targetScope: string;
   conditions?: any[];
   isCustomPoints?: boolean;
+  source?: 'TEAM' | 'CLUB' | 'BOTH';
 }
 
 interface Player {
@@ -69,6 +70,9 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
   const [currentRuleIndex, setCurrentRuleIndex] = useState(0);
   const [ruleAssignments, setRuleAssignments] = useState<RuleAssignment[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
+
+  // Summary tab state
+  const [summaryTab, setSummaryTab] = useState<'TEAM' | 'CLUB'>('TEAM');
 
   // Fetch complete game data if gamePlayers is missing
   useEffect(() => {
@@ -296,6 +300,25 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
       .reduce((sum, assignment) => sum + assignment.points, 0);
   };
 
+  // Calculate totals by rule source for tabbed view
+  const getTotalPointsBySource = (source: 'TEAM' | 'CLUB') => {
+    return ruleAssignments
+      .filter(assignment => {
+        const rule = rules.find(r => r.id === assignment.ruleId);
+        return rule?.source === source || rule?.source === 'BOTH';
+      })
+      .reduce((sum, assignment) => sum + assignment.points, 0);
+  };
+
+  const getPlayerTotalPointsBySource = (playerId: string, source: 'TEAM' | 'CLUB') => {
+    return ruleAssignments
+      .filter(assignment => {
+        const rule = rules.find(r => r.id === assignment.ruleId);
+        return assignment.playerId === playerId && (rule?.source === source || rule?.source === 'BOTH');
+      })
+      .reduce((sum, assignment) => sum + assignment.points, 0);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <GlassCard className="w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -448,7 +471,7 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
                       {currentRule.description && (
                         <p className="text-white/60 text-sm mb-3">{currentRule.description}</p>
                       )}
-                      <div className="flex items-center justify-center gap-3">
+                      <div className="flex items-center justify-center gap-3 flex-wrap">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-400/20 text-green-400 text-sm">
                           <Trophy size={14} />
                           {currentRule.pointsAwarded} points each
@@ -465,6 +488,17 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
                         }`}>
                           {currentRule.category.replace('_', ' ')}
                         </div>
+                        {currentRule.source && (
+                          <div className={`px-2 py-1 rounded text-xs font-medium ${
+                            currentRule.source === 'TEAM'
+                              ? 'bg-orange-400/20 text-orange-400'
+                              : currentRule.source === 'CLUB'
+                              ? 'bg-cyan-400/20 text-cyan-400'
+                              : 'bg-indigo-400/20 text-indigo-400'
+                          }`}>
+                            {currentRule.source === 'BOTH' ? 'TEAM & CLUB' : currentRule.source}
+                          </div>
+                        )}
                       </div>
                       <div className="mt-3 text-sm text-white/40">
                         Rule {currentRuleIndex + 1} of {rules.length}
@@ -580,76 +614,101 @@ export function GameCompletionModal({ game, onComplete, onCancel }: GameCompleti
                   </div>
                 </GlassCard>
 
-                {/* Player Points Summary - Responsive Grid */}
+                {/* Tabbed Points Summary */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-white flex items-center gap-2">
-                    <Users size={16} />
-                    Player Points ({players.filter(gp => getPlayerTotalPoints(gp.player.id) !== 0).length})
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {(() => {
-                      // Calculate highest and lowest points to show trophy and spoon
-                      const playersWithPoints = players.map(gp => ({
-                        ...gp,
-                        totalPoints: getPlayerTotalPoints(gp.player.id)
-                      })).filter(p => p.totalPoints !== 0);
-
-                      const maxPoints = Math.max(...playersWithPoints.map(p => p.totalPoints));
-                      const minPoints = Math.min(...playersWithPoints.map(p => p.totalPoints));
-
-                      // Only show spoon if there are multiple players and the min is different from max
-                      const showSpoon = playersWithPoints.length > 1 && minPoints !== maxPoints;
-
-                      return playersWithPoints.map((gamePlayerWithPoints) => {
-                        const gamePlayer = gamePlayerWithPoints;
-                        const player = gamePlayer.player;
-                        const totalPoints = gamePlayerWithPoints.totalPoints;
-                        const playerAssignments = ruleAssignments.filter(a => a.playerId === player.id);
-                        const isTopPlayer = totalPoints === maxPoints && totalPoints > 0;
-                        const isBottomPlayer = showSpoon && totalPoints === minPoints;
-
-                        return (
-                          <GlassCard key={player.id} padding="sm" className="min-h-0">
-                            <div className="flex justify-between items-start gap-3">
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-white text-sm truncate flex items-center gap-2">
-                                  {player.nickname || player.fullName}
-                                  {isTopPlayer && <Trophy size={14} className="text-yellow-400 flex-shrink-0" />}
-                                  {isBottomPlayer && <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />}
-                                </div>
-                                <div className="text-xs space-y-1 mt-2">
-                                  {playerAssignments.map((assignment) => {
-                                    const rule = rules.find(r => r.id === assignment.ruleId);
-                                    const isNegative = assignment.points < 0;
-                                    return (
-                                      <div key={assignment.ruleId} className={`truncate ${isNegative ? 'text-red-400' : 'text-white/60'}`}>
-                                        {rule?.name}: {assignment.count} × {rule?.pointsAwarded} = {assignment.points}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                              <div className={`text-lg font-bold flex-shrink-0 ${totalPoints < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                {totalPoints}
-                              </div>
-                            </div>
-                          </GlassCard>
-                        );
-                      });
-                    })()}
+                  {/* Tab Navigation */}
+                  <div className="flex items-center justify-center gap-2">
+                    <GlassButton
+                      variant={summaryTab === 'TEAM' ? 'primary' : 'glass'}
+                      size="sm"
+                      onClick={() => setSummaryTab('TEAM')}
+                    >
+                      TEAM ({getTotalPointsBySource('TEAM')} pts)
+                    </GlassButton>
+                    <GlassButton
+                      variant={summaryTab === 'CLUB' ? 'primary' : 'glass'}
+                      size="sm"
+                      onClick={() => setSummaryTab('CLUB')}
+                    >
+                      CLUB ({getTotalPointsBySource('CLUB')} pts)
+                    </GlassButton>
                   </div>
-                </div>
 
-                {/* Total - Compact */}
-                <GlassCard padding="sm" className={`${getTotalPoints() < 0 ? 'bg-red-400/10 border-red-400/30' : 'bg-green-400/10 border-green-400/30'}`}>
-                  <div className="flex justify-between items-center">
-                    <div className="text-white font-medium text-sm">Total Points Awarded</div>
-                    <div className={`text-xl font-bold ${getTotalPoints() < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                      {getTotalPoints()}
+                  {/* Tab Content */}
+                  <div>
+                    <h4 className="text-sm font-medium text-white flex items-center gap-2 mb-3">
+                      <Users size={16} />
+                      {summaryTab} Player Points ({players.filter(gp => getPlayerTotalPointsBySource(gp.player.id, summaryTab) !== 0).length})
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(() => {
+                        // Calculate highest and lowest points for current tab
+                        const playersWithPoints = players.map(gp => ({
+                          ...gp,
+                          totalPoints: getPlayerTotalPointsBySource(gp.player.id, summaryTab)
+                        })).filter(p => p.totalPoints !== 0);
+
+                        const maxPoints = Math.max(...playersWithPoints.map(p => p.totalPoints));
+                        const minPoints = Math.min(...playersWithPoints.map(p => p.totalPoints));
+                        const showSpoon = playersWithPoints.length > 1 && minPoints !== maxPoints;
+
+                        return playersWithPoints.map((gamePlayerWithPoints) => {
+                          const gamePlayer = gamePlayerWithPoints;
+                          const player = gamePlayer.player;
+                          const totalPoints = gamePlayerWithPoints.totalPoints;
+                          const playerAssignments = ruleAssignments.filter(assignment => {
+                            const rule = rules.find(r => r.id === assignment.ruleId);
+                            return assignment.playerId === player.id && (rule?.source === summaryTab || rule?.source === 'BOTH');
+                          });
+                          const isTopPlayer = totalPoints === maxPoints && totalPoints > 0;
+                          const isBottomPlayer = showSpoon && totalPoints === minPoints;
+
+                          return (
+                            <GlassCard key={player.id} padding="sm" className="min-h-0">
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-white text-sm truncate flex items-center gap-2">
+                                    {player.nickname || player.fullName}
+                                    {isTopPlayer && <Trophy size={14} className="text-yellow-400 flex-shrink-0" />}
+                                    {isBottomPlayer && <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />}
+                                  </div>
+                                  <div className="text-xs space-y-1 mt-2">
+                                    {playerAssignments.map((assignment) => {
+                                      const rule = rules.find(r => r.id === assignment.ruleId);
+                                      const isNegative = assignment.points < 0;
+                                      return (
+                                        <div key={assignment.ruleId} className={`truncate ${isNegative ? 'text-red-400' : 'text-white/60'}`}>
+                                          {rule?.name}: {assignment.count} × {rule?.pointsAwarded} = {assignment.points}
+                                          {rule?.source === 'BOTH' && (
+                                            <span className="text-indigo-400 ml-1">(Both)</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                <div className={`text-lg font-bold flex-shrink-0 ${totalPoints < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                  {totalPoints}
+                                </div>
+                              </div>
+                            </GlassCard>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
-                </GlassCard>
+
+                  {/* Total for Current Tab */}
+                  <GlassCard padding="sm" className={`${getTotalPointsBySource(summaryTab) < 0 ? 'bg-red-400/10 border-red-400/30' : 'bg-green-400/10 border-green-400/30'}`}>
+                    <div className="flex justify-between items-center">
+                      <div className="text-white font-medium text-sm">{summaryTab} Total Points</div>
+                      <div className={`text-xl font-bold ${getTotalPointsBySource(summaryTab) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                        {getTotalPointsBySource(summaryTab)}
+                      </div>
+                    </div>
+                  </GlassCard>
+                </div>
 
                 {/* Actions */}
                 <div className="flex justify-between items-center pt-6">

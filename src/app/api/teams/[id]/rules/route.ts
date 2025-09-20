@@ -43,7 +43,9 @@ export async function GET(
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
 
-    let effectiveRules: any[] = [];
+    // Get both team and club rules to show source information
+    const teamRules = new Map<string, any>();
+    const clubRules = new Map<string, any>();
 
     console.log('Team data:', {
       teamId: team.id,
@@ -53,45 +55,10 @@ export async function GET(
       defaultProfileId: team.defaultRulesProfileId
     });
 
+    // Get team-specific rules if available
     if (team.defaultRulesProfile) {
-      // Team has a specific rules profile - use those rules with custom points if set
-      effectiveRules = team.defaultRulesProfile.rules.map(profileRule => ({
-        id: profileRule.rule.id,
-        name: profileRule.rule.name,
-        description: profileRule.rule.description,
-        pointsAwarded: profileRule.customPoints ?? profileRule.rule.pointsAwarded,
-        category: profileRule.rule.category,
-        targetScope: profileRule.rule.targetScope,
-        conditions: profileRule.rule.conditions || [],
-        isCustomPoints: profileRule.customPoints !== null
-      }));
-    } else {
-      // No team-specific profile - get club's default rules profile
-      const clubDefaultProfile = await prisma.rulesProfile.findFirst({
-        where: {
-          clubId: team.clubId,
-          isClubDefault: true,
-          isActive: true
-        },
-        include: {
-          rules: {
-            where: { isEnabled: true },
-            include: {
-              rule: true
-            }
-          }
-        }
-      });
-
-      console.log('Club default profile search:', {
-        clubId: team.clubId,
-        foundProfile: !!clubDefaultProfile,
-        profileId: clubDefaultProfile?.id,
-        rulesCount: clubDefaultProfile?.rules?.length || 0
-      });
-
-      if (clubDefaultProfile) {
-        effectiveRules = clubDefaultProfile.rules.map(profileRule => ({
+      team.defaultRulesProfile.rules.forEach(profileRule => {
+        teamRules.set(profileRule.rule.id, {
           id: profileRule.rule.id,
           name: profileRule.rule.name,
           description: profileRule.rule.description,
@@ -99,33 +66,70 @@ export async function GET(
           category: profileRule.rule.category,
           targetScope: profileRule.rule.targetScope,
           conditions: profileRule.rule.conditions || [],
-          isCustomPoints: profileRule.customPoints !== null
-        }));
-      } else {
-        // No club default profile - get all global rules
-        const globalRules = await prisma.rule.findMany({
-          include: {
-            conditions: true
-          }
+          isCustomPoints: profileRule.customPoints !== null,
+          source: 'TEAM'
         });
-
-        console.log('Global rules fallback:', {
-          globalRulesCount: globalRules.length,
-          globalRuleNames: globalRules.map(r => r.name)
-        });
-
-        effectiveRules = globalRules.map(rule => ({
-          id: rule.id,
-          name: rule.name,
-          description: rule.description,
-          pointsAwarded: rule.pointsAwarded,
-          category: rule.category,
-          targetScope: rule.targetScope,
-          conditions: rule.conditions || [],
-          isCustomPoints: false
-        }));
-      }
+      });
     }
+
+    // Get club's default rules profile
+    const clubDefaultProfile = await prisma.rulesProfile.findFirst({
+      where: {
+        clubId: team.clubId,
+        isClubDefault: true,
+        isActive: true
+      },
+      include: {
+        rules: {
+          where: { isEnabled: true },
+          include: {
+            rule: true
+          }
+        }
+      }
+    });
+
+    console.log('Club default profile search:', {
+      clubId: team.clubId,
+      foundProfile: !!clubDefaultProfile,
+      profileId: clubDefaultProfile?.id,
+      rulesCount: clubDefaultProfile?.rules?.length || 0
+    });
+
+    if (clubDefaultProfile) {
+      clubDefaultProfile.rules.forEach(profileRule => {
+        clubRules.set(profileRule.rule.id, {
+          id: profileRule.rule.id,
+          name: profileRule.rule.name,
+          description: profileRule.rule.description,
+          pointsAwarded: profileRule.customPoints ?? profileRule.rule.pointsAwarded,
+          category: profileRule.rule.category,
+          targetScope: profileRule.rule.targetScope,
+          conditions: profileRule.rule.conditions || [],
+          isCustomPoints: profileRule.customPoints !== null,
+          source: 'CLUB'
+        });
+      });
+    }
+
+    // Merge rules with source information
+    const mergedRules = new Map<string, any>();
+
+    // Add team rules
+    teamRules.forEach((rule, ruleId) => {
+      mergedRules.set(ruleId, { ...rule, source: 'TEAM' });
+    });
+
+    // Add club rules, marking duplicates as BOTH
+    clubRules.forEach((rule, ruleId) => {
+      if (mergedRules.has(ruleId)) {
+        mergedRules.get(ruleId).source = 'BOTH';
+      } else {
+        mergedRules.set(ruleId, { ...rule, source: 'CLUB' });
+      }
+    });
+
+    const effectiveRules = Array.from(mergedRules.values());
 
     // Sort rules by category and name for consistent ordering
     effectiveRules.sort((a, b) => {
